@@ -7,6 +7,7 @@ from scipy import integrate
 from matplotlib import pyplot as plt
 
 from aapy import tobtools
+from tobfilter import tob_filters
 
 THIS_DIR = Path(__file__).parent
 
@@ -98,31 +99,6 @@ def log_sum(data):
 #     return 10.0*np.log10(e)
 
 
-def tob_filters(data: np.array, fs: int,
-                central_frequencies_Hz: np.array) -> list[np.array]:
-    """Filter data into one-third octave bands
-
-    Based on Stack Overflow answer at https://stackoverflow.com/q/56791652/5358968 ."""
-
-    filter_order = 4
-
-    nyquist_rate = fs / 2.0
-
-    filtered_list = []
-    for central_frequency in central_frequencies_Hz:
-        band_id = tobtools.which_tob(central_frequency)
-        lower = tobtools.lower_bound(band_id)
-        upper = tobtools.upper_bound(band_id)
-
-        sos = signal.butter(N=filter_order,
-                            Wn=np.array([lower, upper]) / nyquist_rate,
-                            btype='bandpass',
-                            analog=False,
-                            output='sos')
-
-        filtered_data = signal.sosfiltfilt(sos, data)
-        filtered_list.append(filtered_data)
-    return filtered_list
 
 if __name__=='__main__':
     main()
