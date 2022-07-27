@@ -38,31 +38,13 @@ def main():
     ax.plot(t, data)
     fig.savefig(out_dir / 'waveform.png')
 
-    nyquistRate = fs/2.0
-
-    G = 2
-    factor = np.power(G, 1.0/6.0)
-
-    centerFrequency_Hz = np.array([
+    centreFrequency_Hz = np.array([
         39, 50, 63, 79, 99, 125, 157, 198, 250, 315, 397, 500, 630, 794, 1000,
         1260, 1588, 2000, 2520, 3176, 4000, 5040, 6352, 8000, 10080, 12704,
         16000
         ])
 
-    lowerCutoffFrequency_Hz=centerFrequency_Hz/factor
-    upperCutoffFrequency_Hz=centerFrequency_Hz*factor
-
-    filtered_list = []
-    for lower,upper in zip(lowerCutoffFrequency_Hz, upperCutoffFrequency_Hz):
-        # Design filter
-        sos = signal.butter(N=4, Wn=np.array(
-            [lower, upper])/nyquistRate, btype='bandpass', analog=False, output='sos')
-
-        # Compute frequency response of the filter.
-
-        # Filter signal
-        filt_data = signal.sosfiltfilt(sos, data)
-        filtered_list.append(filt_data)
+    filtered_list = tob_filters(data, fs, centreFrequency_Hz)
 
     sel_list = []
     fig, ax = plt.subplots()
@@ -81,7 +63,7 @@ def main():
     fig.savefig(out_dir / 'data_vs_reconstructed.png')
 
     fig, ax = plt.subplots()
-    ax.semilogx(centerFrequency_Hz, np.array(sel_list))
+    ax.semilogx(centreFrequency_Hz, np.array(sel_list))
     ax.set_title(f'SEL = {log_sum(sel_list):.2f} dB re 1 uPa^2 s')
     fig.savefig(out_dir / 'TOB_SEL.png')
 
@@ -119,6 +101,28 @@ def log_sum(data):
 #     e = np.sum(10.0**(np.array(data)/10))
 #     return 10.0*np.log10(e)
 
+
+def tob_filters(data: np.array, fs: int, centerFrequency_Hz) -> list[np.array]:
+    nyquistRate = fs/2.0
+
+    G = 2
+    factor = np.power(G, 1.0/6.0)
+
+    lowerCutoffFrequency_Hz=centerFrequency_Hz/factor
+    upperCutoffFrequency_Hz=centerFrequency_Hz*factor
+
+    filtered_list = []
+    for lower,upper in zip(lowerCutoffFrequency_Hz, upperCutoffFrequency_Hz):
+        # Design filter
+        sos = signal.butter(N=4, Wn=np.array(
+            [lower, upper])/nyquistRate, btype='bandpass', analog=False, output='sos')
+
+        # Compute frequency response of the filter.
+
+        # Filter signal
+        filt_data = signal.sosfiltfilt(sos, data)
+        filtered_list.append(filt_data)
+    return filtered_list
 
 if __name__=='__main__':
     main()
