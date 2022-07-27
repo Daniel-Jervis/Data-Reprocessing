@@ -1,5 +1,3 @@
-# https://stackoverflow.com/q/56791652/5358968
-
 from pathlib import Path
 
 import numpy as np
@@ -7,6 +5,8 @@ import scipy.io as sio
 from scipy import signal
 from scipy import integrate
 from matplotlib import pyplot as plt
+
+from aapy import tobtools
 
 THIS_DIR = Path(__file__).parent
 
@@ -38,13 +38,9 @@ def main():
     ax.plot(t, data)
     fig.savefig(out_dir / 'waveform.png')
 
-    centreFrequency_Hz = np.array([
-        39, 50, 63, 79, 99, 125, 157, 198, 250, 315, 397, 500, 630, 794, 1000,
-        1260, 1588, 2000, 2520, 3176, 4000, 5040, 6352, 8000, 10080, 12704,
-        16000
-        ])
+    central_frequencies_Hz = np.array([tobtools.nominal_freq(x) for x in range(16, 43)])
 
-    filtered_list = tob_filters(data, fs, centreFrequency_Hz)
+    filtered_list = tob_filters(data, fs, central_frequencies_Hz)
 
     sel_list = []
     fig, ax = plt.subplots()
@@ -63,7 +59,7 @@ def main():
     fig.savefig(out_dir / 'data_vs_reconstructed.png')
 
     fig, ax = plt.subplots()
-    ax.semilogx(centreFrequency_Hz, np.array(sel_list))
+    ax.semilogx(central_frequencies_Hz, np.array(sel_list))
     ax.set_title(f'SEL = {log_sum(sel_list):.2f} dB re 1 uPa^2 s')
     fig.savefig(out_dir / 'TOB_SEL.png')
 
@@ -102,28 +98,31 @@ def log_sum(data):
 #     return 10.0*np.log10(e)
 
 
-def tob_filters(data: np.array, fs: int, centerFrequency_Hz) -> list[np.array]:
-    nyquistRate = fs/2.0
+def tob_filters(data: np.array, fs: int,
+                central_frequencies_Hz: np.array) -> list[np.array]:
+    """Filter data into one-third octave bands
 
-    G = 2
-    factor = np.power(G, 1.0/6.0)
+    Based on Stack Overflow answer at https://stackoverflow.com/q/56791652/5358968 ."""
 
-    lowerCutoffFrequency_Hz=centerFrequency_Hz/factor
-    upperCutoffFrequency_Hz=centerFrequency_Hz*factor
+    filter_order = 4
+
+    nyquist_rate = fs / 2.0
 
     filtered_list = []
-    for lower,upper in zip(lowerCutoffFrequency_Hz, upperCutoffFrequency_Hz):
-        # Design filter
-        sos = signal.butter(N=4, Wn=np.array(
-            [lower, upper])/nyquistRate, btype='bandpass', analog=False, output='sos')
+    for central_frequency in central_frequencies_Hz:
+        band_id = tobtools.which_tob(central_frequency)
+        lower = tobtools.lower_bound(band_id)
+        upper = tobtools.upper_bound(band_id)
 
-        # Compute frequency response of the filter.
+        sos = signal.butter(N=filter_order,
+                            Wn=np.array([lower, upper]) / nyquist_rate,
+                            btype='bandpass',
+                            analog=False,
+                            output='sos')
 
-        # Filter signal
-        filt_data = signal.sosfiltfilt(sos, data)
-        filtered_list.append(filt_data)
+        filtered_data = signal.sosfiltfilt(sos, data)
+        filtered_list.append(filtered_data)
     return filtered_list
 
 if __name__=='__main__':
     main()
-
